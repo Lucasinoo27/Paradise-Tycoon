@@ -1,0 +1,6 @@
+{
+  "name": "ParadiseTycoon.GameState.Tests",
+  "references": ["ParadiseTycoon.GameState"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

@@ -1,19 +1,17 @@
 using System.Globalization;
+using ParadiseTycoon.GameState;
 using ParadiseTycoon.Scrum104;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace ParadiseTycoon.Hud
 {
-    /// <summary>Demo HUD. Values are presentation data, not an economy implementation.</summary>
+    /// <summary>Event-driven presentation of the shared game state.</summary>
     public sealed class ResortHud : MonoBehaviour
     {
         [SerializeField] TMPro.TMP_Text coinsLabel, energyLabel, resortLabel, statusLabel;
         [SerializeField] Button pauseButton, buildButton, upgradeButton;
-        [SerializeField, Min(0)] int demoCoins = 1250;
-        [SerializeField, Min(0)] int demoEnergy = 80;
-        [SerializeField, Min(1)] int demoMaxEnergy = 100;
-        [SerializeField, Min(0)] int demoResortValue = 24500;
+        IGameState state;
         PauseMenuController menu;
         HudLegacyPauseShortcut legacyPause;
         public Button PauseButton => pauseButton;
@@ -29,16 +27,33 @@ namespace ParadiseTycoon.Hud
             pauseButton.onClick.AddListener(OpenPause);
             buildButton.onClick.AddListener(PreviewBuild);
             upgradeButton.onClick.AddListener(PreviewUpgrade);
-            RefreshDemoValues();
+            GameSession.StateAvailable += BindState;
+            BindState(GameSession.EnsureCreated().State);
         }
 
-        public void RefreshDemoValues()
+        public void BindState(IGameState source)
         {
+            if (state != null) state.Changed -= RefreshValues;
+            state = source;
+            if (state != null) state.Changed += RefreshValues;
+            RefreshValues();
+        }
+
+        public void RefreshValues()
+        {
+            if (state == null)
+            {
+                coinsLabel.text = energyLabel.text = resortLabel.text = "—";
+                statusLabel.text = "Uložený postup sa nepodarilo načítať.";
+                return;
+            }
             var format = CultureInfo.GetCultureInfo("sk-SK");
-            coinsLabel.text = Mathf.Max(0, demoCoins).ToString("N0", format);
-            energyLabel.text = Mathf.Clamp(demoEnergy, 0, Mathf.Max(1, demoMaxEnergy)) + " / " + Mathf.Max(1, demoMaxEnergy);
-            resortLabel.text = Mathf.Max(0, demoResortValue).ToString("N0", format);
-            statusLabel.text = "Vitaj vo svojom rezorte!";
+            coinsLabel.text = state.Coins.ToString("N0", format);
+            energyLabel.text = state.Energy + " / " + state.MaxEnergy;
+            resortLabel.text = state.ResortValue.ToString("N0", format);
+            statusLabel.text = state.Phase == WavePhase.Active
+                ? "Prebieha vlna " + state.CurrentWave
+                : "Pripravený na vlnu " + state.CurrentWave;
         }
 
         void LateUpdate()
@@ -76,6 +91,9 @@ namespace ParadiseTycoon.Hud
         }
         void OnDisable()
         {
+            GameSession.StateAvailable -= BindState;
+            if (state != null) state.Changed -= RefreshValues;
+            state = null;
             pauseButton.onClick.RemoveListener(OpenPause);
             buildButton.onClick.RemoveListener(PreviewBuild);
             upgradeButton.onClick.RemoveListener(PreviewUpgrade);
